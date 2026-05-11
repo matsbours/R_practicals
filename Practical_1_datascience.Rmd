@@ -1,0 +1,272 @@
+---
+title: "Practical_1_datascience"
+output: html_document
+date: "2026-05-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+
+Preliminaries
+
+The learning goals for this practical are:
+
+    To make scatterplots, histograms and boxplots in R.
+    To interpret the generated plots in relation to questions in plant breeding.
+
+Code is contained in blocks and in-text references to functions, function arguments, and objects will be denoted as foo.
+Downloading the files
+
+R will search for the input files in a prespecified directory. R won’t be able to find the files if you do not save them in a well known location. Thus, DO NOT save your files in the desktop of your computer. Instead, create a folder specifically for this course and practical.
+Packages
+
+Set the working directory and activate the required packages:
+
+```{r}
+### Set working directory to convenience
+setwd("/Users/matsbours/Library/CloudStorage/OneDrive-SharedLibraries-StichtingJanIngenHouszInstitute/Project - GPL0004 - Genomic selection - Research/PhD/year_0/conferences_and_training/Data Science for Plant Breeding and Genetics/R_practicals")
+
+## Packages (install and invoke)
+pkgs <- rownames(installed.packages())
+
+if (!"tidyverse" %in% pkgs) install.packages("tidyverse")
+if (!"statgenSTA" %in% pkgs) install.packages("statgenSTA")
+```
+
+
+The code recognizes if certain packages are missing from your package library and, if so, will install them automatically.
+
+Now, we need to load the packages:
+
+```{r}
+library(tidyverse)
+library(statgenSTA)
+```
+
+
+Data description
+
+In this practical we will be using the TDMaize data set that is contained in the statgenSTA package. This data set corresponds to an F2 maize reference population from the CIMMYT maize drought breeding program, which was derived from the cross of a drought-tolerant line (P1) with a drought susceptible line (P2) as described in detail by Ribaut et al. (1996, 1997). To your convenience, we have converted this TD object into a data frame that you can import from a ‘.csv’ file.
+DNA from 211 F2 plants was extracted to produce information for 132 co-dominant markers on 10 linkage groups. Phenotypic evaluations were performed on 211 F2:3 families, each one derived from an original F2 plant. The families were evaluated under different water and nitrogen regimes during 1992, 1994 and 1996. In the winter of 1992 three water regimes were imposed on the trials: well watered (NS), intermediate stress (IS) and severe stress (SS). In the winter of 1994, only the IS and SS trials were available. Nitrogen availability varied in the 1996 trials, with two low nitrogen treatments (LN, in winter and summer) and one high-nitrogen treatment (HN in summer). In each of the trials, five traits were evaluated but only grain yield is included in the data.
+Exercise 1: Data wrangling
+
+Data wrangling is the process of gathering, selecting, and transforming data to answer an analytical question.
+
+The first step is to load the data that we will use for the exercises.
+
+```{r}
+# Import the data
+dat1 <- read.csv("DROPS_maize.csv")
+# Print the first records
+head(dat1)
+
+# Print the trial names
+unique(dat1$trial)
+```
+
+
+    Go to the data environment (right part of your screen) and click on the blue arrow next to the object ‘dat1’. What is mentioned at ‘trial’, ‘genotype’ and ‘yld’?
+    In the data environment, click on ‘dat1’ and observe the new tab with data that appears next to your R script. How many rows are there in this data frame?
+    The unique trial names are printed. How many are there?
+     8
+    What is in the name of the trials, i.e. how are they coded?
+       "HN96b" "IS92a" "IS94a" "LN96a" "LN96b" "NS92a" "SS92a" "SS94a"
+
+
+The next step is to subset the data for the trials that we want to plot in the scatter plot (“IS94a” and “IS92a”). We make a new data.frame for each trial (t1 and t2).
+
+```{r}
+####  "IS94a"
+t1 <- subset(dat1, trial == "IS94a") # subset the data for trial "IS94a"
+head(t1)
+colnames(t1)[3] <- "yld_IS94a" # replace the name of the third column by yld_IS94a
+head(t1)
+nrow(t1)
+# Calculate summary statistics for trial "IS94a"
+summary(t1)
+
+####  "IS92a"
+t2 <- subset(dat1, trial == "IS92a") # subset the data for trial "IS92a"
+head(t2)
+colnames(t2)[3] <- "yld_IS92a" # replace the name of the third column by yld_IS92a
+head(t2)
+nrow(t2)
+```
+
+
+
+    After subsetting the data, explore the objects ‘t1’ and ‘t2’. How many rows do they contain? What is in each row?
+    211 rows both
+    
+    Run the command ‘summary’ for data frames ‘t1’ and ‘t2’. What is the minimum, maximum and mean yield in each trial? How many genotypes are there? Does this coincide with the number of rows?
+    
+
+
+Now we will use the function left_join from tidyverse. This function combines both data.frames by matching the ‘by’ rows from the second data frame to the first resulting in a new data.frame, called a tibble in tidyverse. In our example, this means that the rows in the column ‘genotype’ in ‘t2’ will be matched to the rows in the column ‘genotype’ in ‘t1’. Some additional info about this function: https://raw.githubusercontent.com/rstudio/cheatsheets/master/data-transformation.pdf
+
+```{r}
+# Combine data from both trials
+dat2 <- left_join(t1[, 2:3], t2[, 2:3], by = "genotype")
+head(dat2)
+```
+
+
+Exercise 2: Scatterplots
+
+Now we are ready to plot the data:
+
+
+```{r}
+# Create the scatterplot
+(p1 <- ggplot(data = dat2) + 
+  geom_point(mapping = aes(x = yld_IS94a, y = yld_IS92a)))
+```
+
+
+It is a good scientific practice to add the measurement units on the axis titles of each plot. This can be easily done with the commands xlab and ylab.
+
+
+```{r}
+# Modify axis titles
+p1 +
+  xlab("Yield in IS94a (g/m2)") + 
+  ylab("Yield in IS92a (g/m2)")
+```
+
+    What is the use of this scatterplot?
+      To visualise the correlation between the yields
+    Describe the relationship between yield in IS94a and in IS92a.
+      There is a bit of spread, but there is a positive relationship.
+
+
+Exercise 3: Histograms
+
+Now, let’s investigate the full data set, so all eight trials.
+```{r}
+## Histogram for all trials simultaneously
+ggplot(data = dat1) + 
+  geom_histogram(mapping = aes(x = yld))
+```
+
+
+
+    The yield distribution does not look symmetric. Is this a problem?
+      No not necesarily
+    Can you give a rough estimate for the median? Is it possible to give an estimate for the mean as well?
+      median: 400
+
+```{r}
+
+## Histogram for each trial separately
+ggplot(data = dat1) + 
+  geom_histogram(mapping = aes(x = yld)) +
+  facet_wrap(~trial, ncol = 4)
+
+
+dat1 %>%
+  group_by(trial) %>%
+  summarise(variance = var(yld, na.rm = TRUE))
+```
+
+
+    Which environments have a symmetric distribution and which not?
+      Symetric:  "IS92a" "IS94a"  "NS92a"  "SS94a"
+      non-symetric: [1] "HN96b" LN96a" "NS92a" "SS94a"
+    Which environment has the highest average yield?
+      NS92a
+    Which environments show the highest variation?
+      NS92a
+
+Exercise 4: Boxplots
+
+We will now create a boxplot with ggplot2 and color the boxes by trial.
+
+
+```{r}
+## Boxplot with ggplot2
+ggplot(data = dat1) + 
+  geom_boxplot(mapping = aes(x = trial, y = yld, fill = trial)) 
+```
+
+    How are the boxes ordered along the abscissa (x axis)?
+      on the order in the dataframe
+    Which environments show the lowest variation?
+      LN96a+b
+    Give an estimate for the range of yield in IS94a.
+      5-800
+    Why is there a dot above the upper whisker for environment SS94a?
+      That is an outlier that falls out of 1.5 * IQR (inter qaurtile range)
+
+
+We will now create a boxplot using the package statgenSTA. First, we need to convert the data frame ‘dat1’ into a TD object. We will do this as follows:
+
+```{r}
+## Convert the data frame into a TD object (= a list with one data frame per trial)
+TDMaize <- createTD(dat1, genotype = "genotype", trial = "trial") 
+```
+
+
+There, we are specifying that the genotype is contained in the column ‘genotype’ and the trial, in the column ‘trial’ in dat1.
+
+    Go to the data environment and click on the blue arrow next to the object ‘TDMaize’. What type of object is ‘TDMaize’ and how many elements are in this object? What is contained in each element?
+      TDmaize is a list of dataframes and contains 8 dataframes
+
+The plot.TD function of this package is a wrapper for the ggplot function. The main difference is that plot.TD has some options to more easily sort and color the data. It can also sequentially make plots for several traits, which can be handy in breeding trials with many traits.
+
+```{r}
+## Create a boxplot for grain yield, sorted by increasing mean yield
+plot(TDMaize, plotType = "box", traits = "yld", 
+     orderBy = "descending", colorTrialBy = "trial")
+```
+
+
+    Run help(plot.TD) to inspect the help of this function. Interpret the arguments traits and orderBy.
+    How are the boxes ordered along the abscissa (x axis)? Change the orderBy to 'descending' and observe what happens to the plot.
+    The values are ordered by ascending means
+
+The last part of this exercise is to make a plot that combines scatterplots and histograms. We will use the option plotType = "scatter" in the statgenSTA package.
+
+```{r}
+## Create a scatter plot matrix for grain yield
+plot(TDMaize, plotType = "scatter", traits = "yld", 
+     addCorr = "tl", colorTrialBy = "trial")
+```
+
+
+    What is shown on the diagonal? And in the off-diagonals?
+      The phenotype distributions.
+    Interpret the correlation values printed after the . Do they coincide with what you see in the scatterplots?
+      Yes these values coincide
+    Which trials have the highest correlation and what does that mean?
+      IS92A & IS94a here the environmental conditions are the most alike
+    Some trials show a very low correlation. What does that mean? What is the consequence for a breeder?
+      The genotypic effect is small here. This could make breeding more difficult
+    Go to the vignette of ggplot2 or to https://r4ds.had.co.nz/, the theme option, choose 5 themes (e.g. axis.title.x and other of your preference) and explain them to the class by modifying the boxplot that you made above.
+      
+    In this practical you used geom_boxplot, geom_histogram and geom_point. Check which other geoms are available in ggplot2, choose 2 of them and explain them to the class.
+
+
+
