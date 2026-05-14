@@ -1,0 +1,361 @@
+---
+title: "Practical 3"
+author: "Mats Bours"
+date: "2026-05-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+
+Practical 3: Analysis of experimental designs using mixed models
+
+Wageningen University & Research
+
+Mathematical & Statistical Methods group – Biometris
+
+Wageningen University & Research
+Preliminaries
+
+The learning goals for this practical are:
+
+    Perform an analysis of a trial designed as an RCBD by a linear model
+    Perform analyses of other types of design by a linear mixed model using lme4
+    Estimate adjusted genotypic means with correct standard errors
+    Visualize the layout and the phenotypes of experiments .
+
+Code is contained in blocks and in-text references to functions, function arguments, and objects will be denoted as foo.
+Packages
+
+Set the working directory to convenience and activate the required packages:
+
+```{r}
+## Set working directory to convenience
+setwd("/Users/matsbours/Library/CloudStorage/OneDrive-SharedLibraries-StichtingJanIngenHouszInstitute/Project - GPL0004 - Genomic selection - Research/PhD/year_0/conferences_and_training/Data Science for Plant Breeding and Genetics/R_practicals")
+
+## Packages (install and invoke)
+pkgs <- rownames(installed.packages())
+
+if (!"tidyverse" %in% pkgs) install.packages("tidyverse")
+if (!"statgenSTA" %in% pkgs) install.packages("statgenSTA")
+if (!"lme4" %in% pkgs) install.packages("lme4")
+if (!"emmeans" %in% pkgs) install.packages("emmeans")
+if (!"lmerTest" %in% pkgs) install.packages("lmerTest")
+if (!"pbkrtest" %in% pkgs) install.packages("pbkrtest")
+if (!"agricolae" %in% pkgs) install.packages("agricolae")
+```
+
+
+The code recognizes if certain packages are missing from your package library and, if so, will install them on the fly.
+
+Now, we need to load the packages:
+
+```{r}
+library(tidyverse)
+library(statgenSTA)
+library(emmeans)
+library(lmerTest)
+library(lme4)
+library(pbkrtest)
+library(agricolae)
+```
+
+
+Exercise 1: Correctly analyzing the sweetpotato experiment: RCBD
+
+In this exercise we will use yield data of 15 sweetpotato genotypes that were grown in a RCBD with three replicates.
+
+We will import the data from a .csv file.
+
+```{r}
+dat <- read.csv("W1M_Sweetpotato_RCBD.csv")
+head(dat)
+```
+
+
+In this exercise we will fit a model that corresponds to the way in which the experiment was actually carried out: as an RCBD. This means, we will fit a model with block effects.
+
+```{r}
+m2 <- lm(yield ~ block + Genotype, data = dat)
+
+# Print the ANOVA table
+anova(m2)
+```
+
+
+    Give the mathematical notation of the model including indices.
+    y = u + Gi + B + e
+    Fit m2 and print the ANOVA table. How many degrees of freedom are used for the blocks? And for the genotypes?.
+      2 df for blocks, 14 for the genetypes
+    Compare the relative size of the mean squares for the blocks and for the genotypes. Which of them seem to contribute more to the total variation?
+      the block seems to contribute more
+    When you compare the residual mean square for the RCBD analysis with the residual mean square for the analysis under the assumption of a completely randomized design (CRD), an analysis you performed yesterday, which change do you observe and is this change as you would expect?
+      The residual mean sq is a lot lower, this is what you would expect since a bigger proportion of the variance is explained by the block
+    What is the result of the test on differences between genotypes? Do you see a difference between the analysis under the completely randomized design and the RCBD?
+      The sums of squares and the mean sq are the same, but the F-statistic is a lot higher
+
+
+Print the parameter estimates and use the function emmeans to calculate the means per genotype.
+
+```{r}
+# Print parameter estimates
+summary(m2)
+
+# Print the means per genotype
+emmeans(m2, ~ Genotype)
+```
+
+
+    Use the parameter estimates to calculate the mean for genotypes 1 and 2.
+      G1: (3849 + 3849 + 57.1 + 3849 + 134.7)/3 = 3913
+      G2: (3849 + 19.95 + 3849 + 57.1 +19.95 + 3849 +19.95 + 134.7)/3 = 3932
+    Give the genotype means calculated in the emmeans function?
+     they are the same
+    Does this result coincide with what you had calculated by hand?
+      Yes
+
+Given that the ANOVA table indicates that at least one genotype is different, it makes sense to apply an LSD test to compare them. We will use the function LSD.test from the agricolae package to do this test.
+
+```{r}
+# Compare genotypes
+out2 <- LSD.test(m2, trt = "Genotype", p.adj = "none", console = TRUE)
+
+# Plot genotype means and their standard error
+plot(out2, variation = "SE") # variation standard deviation
+```
+
+
+    Give the least significant difference.
+     LSD = 56.04881
+    Look at the variety comparisons (in the table with the letters, or in the plot). Identify one pair of genotypes that are different.
+      G13-G01 are different
+    For the pair that you identified. Calculate the difference between their means. Is the difference larger than the LSD?
+      4037-3913 = 124, this is more than the LSD
+
+
+    Discuss the general purpose of including blocks and whether that purpose was achieved in this example. Mention concrete elements in the results that support your arguments.
+      The inclusion of the blocks allows for better analysis of the genotypic effect.
+    Discuss which considerations in relation to the heterogeneity of experimental units are needed when defining the blocks.
+      The heterogenity within a block should be minimal
+      
+
+
+Exercise 2: Analysis of an experiment on oat yield
+
+We work with the experiment on oat yield from the lecture. Yield of oats is related to two factors: type of fertilizer (with 3 levels) and variety (with 4 levels).
+
+Factor fertilizer is randomized over the nine fields. Factor variety is randomized over plots within fields (16 plots per field). Please familiarize yourself with the data first (using View, summary etc.)
+
+The data was analysed by the following mixed model:
+
+with fixed effects for type of fertilizer (, ), variety (, ), and their interaction (), and independent normally distributed random effects for fields () and residual error (), with zero means and components of variance
+and , respectively.
+
+```{r}
+# read the data
+dat2 <- read.csv("oats.csv")
+summary(dat2)
+
+# convert numbers to factors needed for analysis
+dat2$field <- factor(dat2$Field) # Field
+dat2$t <- factor(dat2$T, labels = c("T1", "T2", "T3")) # Type of fertilizer
+dat2$v <- factor(dat2$V, labels = c("V1", "V2", "V3", "V4")) # Variety
+```
+
+
+We will analyse the data with REML, using the function lmer from the package lme4.
+
+```{r}
+# the mixed model again, now fitted with REML
+reml <- lmer(y ~ t + v + t:v + (1|field), data = dat2)
+summary(reml, correlation = FALSE)
+```
+
+
+    Identify in the output the estimates for the two components of variance. What do the magnitudes of the estimates for the components of variance tell you about the variation between fields and plots within fields? How will the size of these variance components affect the tests for fertilizer and variety main effects and their interaction?
+      The amount of variance between the fields appears to be bigger than the variation of of plots within fields (captured in the residual).
+      Because a big proportion of the varianceis accounted for, the effect of the main effects and their interactions can be tested
+
+
+We are going to construct an F-test for the interaction between fertilizer types and varieties within the context of linear mixed models using REML. We use a function called KRmodcomp from the package pbkrtest to calculate the F-test from Kenward and Roger. The function KRmodcomp compares two models.
+
+```{r}
+# the F-test for fertilizer:variety interaction again
+reml1 <- lmer(y ~ t + v + (1|field), data = dat2)
+kr <- KRmodcomp(reml, reml1)
+summary(kr)
+```
+
+    Which two models are compared in the above F-test (Kenward and Roger test)?
+      the full model and the ruduced (without interactive term) model
+    What is the conclusion of the test?
+      there is no interaction between the main effects
+
+
+```{r}
+## anova table of the reml model
+anova(reml)
+
+# the pairwise comparisons between varieties
+comparevar <- emmeans(reml, pairwise ~ v, adjust = "none")
+summary(comparevar)
+
+# the pairwise comparisons between fertilizers
+comparefert <- emmeans(reml, pairwise ~ t, adjust = "none")
+summary(comparefert)
+```
+
+
+    Finally, we are going to look at all pairwise comparisons (significance level ) between varieties with routine emmeans from library emmeans. The option ‘adjust=none’ in the program lines above provides us with separate t-tests without any correction for multiple testing, i.e. Fisher’s Least Significant Difference method. Summarize your conclusions.
+      There are significant differences between pairs of varieties, while there aren't for comparissons between the fertilizer levels
+    Although the F-test does not show any systematic differences between types of fertilizer, for illustrative purposes, we ask for pairwise comparisons between fertilizer types. What is the standard error to compare two means for fertilizer types and the standard error to compare two variety means? How do these standard errors relate to the variance components for fields and plots within fields obtained earlier.
+   SE =  sqrt(2*(3*12.3^2)/3) = 17.39
+   
+   how do these relate to the variance components?
+   get back to this one!
+      
+
+
+Exercise 3: Balanced incomplete blocks
+
+In this exercise we will use data on 6 tomato varieties that had to be evaluated. Unfortunately, the greenhouse tables that are used can only accommodate 5 plants. Therefore, we had to distribute the 6 varieties over 6 blocks, each of them corresponding to one table with 5 tomato varieties. The design is balanced because all pairs of varieties occur together on a table the same number of times.
+
+```{r}
+# Import the data
+bibd <- read.csv("Tomato_BIBD.csv")
+
+# Print the first records
+head(bibd)
+```
+
+
+    Inspect the object bibd. How many genotypes are there? How many blocks?
+
+
+As usual, the next step will be to visualize the data.
+
+```{r}
+## Create TD object and plot irrigation treatments
+TD <- createTD(bibd, genotype = "geno", trial = "exp",
+               rowCoord = "row", colCoord = "col",
+               repId = "block")
+
+## Create layout plot 
+plot(TD, plotType = "layout", showGeno = TRUE,
+     highlight = unique(bibd$geno))
+```
+
+
+    How many genotypes are there per block?
+       1 genotype/ block
+    How are blocks arranged in space? (think about row and column coordinates in the greenhouse)
+      The blocks are seperating the rows in two blocks and the columns
+
+We will now make boxplots to visualize the variation between blocks and between genotypes.
+
+```{r}
+# Make a boxplot per block
+ggplot(bibd, aes(x = block, group = block, 
+                 y = pheno, fill = block)) +
+  geom_boxplot() +
+  ylab(expression(paste("Yield (Kg m"^"-2",")")))
+```
+
+
+    Is yield similar between blocks?
+      no in block 1 it is lower
+    Which blocks seem to be different?
+      block 1
+
+
+In the boxplot for genotypes, we will introduce a new coloring option; the option scale_fill_manual, which allows to manually specify colors to be used to fill the boxes.
+
+```{r}
+# Make a boxplot per genotype
+ggplot(bibd, aes(x = geno, group = geno, 
+                 y = pheno, fill = geno)) +
+  geom_boxplot() +
+  scale_fill_manual(values=c("palegreen1", "skyblue2", "violet",
+                             "peachpuff1", "steelblue4", "lightgoldenrod")) +
+  ylab(expression(paste("Yield (Kg m"^"-2",")")))
+```
+
+
+    Do genotypes have different yield?
+      Yes
+    Are there outlying points? Do they occur for all genotypes?
+    They occur for all, but genotype D
+    Do these outlying points occur in particular genotypes or blocks?
+      the outliers occur in block1
+
+
+We will now fit a mixed model. In this model, blocks are considered as random because they induce correlation between observations; plants growing in the same block are more likely to experience similar growing conditions than those in different blocks. Another reason to consider them random is because we want to recover information between blocks. This can be done by assuming that blocks come from a common normal distribution.
+
+```{r}
+# Fit a mixed model with random blocks
+m3 <- lmer(pheno ~ (1|block) + geno, data = bibd)
+
+# Extract mixed model results
+vc <- VarCorr(m3) #extract v comp
+anova(m3) # extract Anova table for fixed effects
+print(vc, comp = "Variance", digits = 3) #print v comp
+```
+
+
+    Give the variance component for the blocks and compare it to the residual variance?
+      the variance component is 150.12, it is higher
+    What is the result of the test for genotypes?
+      That it has little effect
+
+
+Breeders are usually interested in comparing genotype means to make their selections. A naive approach would be to just calculate the simple averages:
+
+```{r}
+# Calculate the simple averages per genotype
+aggregate(pheno ~ geno, dat = bibd, FUN = mean)
+```
+
+An alternative to calculating the simple averages would be to calculate the means for each genotype, after correcting for block effects (using the model m3). This second approach is more correct because it takes into account that not all genotypes occur in each block.
+
+```{r}
+(means1 <- emmeans(m3, ~  geno))
+
+```
+
+
+    Compare the simple averages per genotype with the adjusted means obtained applying the emmeans function to the model m3. Are they similar? Should they be similar?
+      They differ quite a bit espacialy for D. This could be expected since the block has a large effect.
+    Yet another alternative analysis would have taken the blocks fixed. Are you able to run the analysis using the lmer statement with blocks fixed and compare the genotypic means from this analysis with the genotypic means already obtained? Which type of genotypic means will you prefer, those obtained with blocks fixed or random and why? And what is the value of the simple averages?
+    The means are the same, because it is a balanced design.
+    
+```{r}
+
+reml_random <- lmer(pheno ~ geno + (1|block), data=bibd)
+summary(reml_random, correlation=FALSE)
+(means2 <- emmeans(reml_random, ~  geno))
+
+```
+

@@ -1,0 +1,456 @@
+---
+title: "Practical 2"
+author: "Mats Bours"
+date: "2026-05-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+Practical 2: Linear regression and ANOVA
+
+Wageningen University & Research
+
+Mathematical & Statistical Methods group – Biometris
+
+Wageningen University & Research
+Preliminaries
+
+The learning goals for this practical are:
+
+    Fit linear regression models using R and interpret the results.
+    Fit one- and two-way ANOVA models using R and interpret the results.
+    Visualize the layout of a randomized complete blocks (RCBD) design using R and identify its main characteristics.
+    Fit linear models for a completely randomized design (CRD) using R and interpret their results.
+
+Code is contained in blocks and in-text references to functions, function arguments, and objects will be denoted as foo.
+Packages
+
+Set the working directory to convenience and activate the required packages:
+
+```{r}
+### Set working directory to convenience
+setwd("/Users/matsbours/Library/CloudStorage/OneDrive-SharedLibraries-StichtingJanIngenHouszInstitute/Project - GPL0004 - Genomic selection - Research/PhD/year_0/conferences_and_training/Data Science for Plant Breeding and Genetics/R_practicals")
+### Packages
+pkgs <- rownames(installed.packages())
+## install packages when missing
+if (!"tidyverse" %in% pkgs) install.packages("tidyverse")
+if (!"statgenSTA" %in% pkgs) install.packages("statgenSTA")
+if (!"emmeans" %in% pkgs) install.packages("emmeans")
+if (!"agricolae" %in% pkgs) install.packages("agricolae")
+```
+
+
+The code recognizes if certain packages are missing from your package library and, if so, will install them on the fly.
+
+Now, we need to load the packages:
+
+```{r}
+library(tidyverse)
+library(statgenSTA)
+library(emmeans)
+library(agricolae)
+```
+
+
+Exercise 1: simple linear regression and ANOVA
+Data: Potato response to Nitrogen
+
+In this exercise we will use yield data of a potato variety that was grown under 6 levels of nitrogen. The levels for N uptake were: 50, 70, 90, 110, 130 and 150 kg/ha. There are three replicates for each nitrogen level, assuming a completely randomized design, i.e., each nitrogen level has the same probability to be assigned to an experimental plot.
+
+An agronomist would like to quantify the potato yield response to nitrogen. (S)he would like to know whether:
+
+    there is a linear relationship between yield and nitrogen
+    there are specific levels of nitrogen that lead to a different yield
+
+First, we import the data:
+
+```{r}
+# Read in the data 
+datP <- read.csv(file = "W1M_Potato_N.csv")
+
+# Print the first records
+head(datP)
+```
+
+
+Let’s inspect the datP object.
+
+```{r}
+str(datP)
+
+```
+
+Before doing the analysis, it is always good practice to plot the data:
+
+```{r}
+# Plot the data
+ggplot(data = datP, aes(x = N_quant, y = yield)) +
+  geom_point() + 
+  ylab("Yield (kg/ha)") +
+  xlab("N uptake (kg/ha)")
+```
+
+
+    Based on this scatterplot, what is your hypothesis about the relationship between yield and nitrogen?
+      There is a positive linear relationship 
+
+
+Simple Linear Regression
+
+In this part we will use Nitrogen as a quantitative variable and will fit a Simple Linear Regression model to test whether the slope is different from zero ().
+
+```{r}
+# Fit a simple linear regression model (yield in response to N)
+lmSLR <- lm(yield ~ N_quant, data = datP)
+
+# Test coefficients (intercept and slope)
+summary(lmSLR)
+```
+
+    Look at the t statistic for the slope (N_quant). How many degrees of freedom are used to test for N_quant? Explain how the number of degrees of freedom is obtained.
+      1, 1 for the intercept, and 16 for the residual error
+    Give the estimate for the slope. How would you interpret it in terms of the yield response to nitrogen?
+      0.28, this is the estimated increase of yield per increase in N
+    Using the estimates for the intercept and slope, write down the regression equation.
+     y = -1.3 + 0.28x + E
+    What is the Adjusted R-squared and what does is mean?
+     it is 0.9542 and indicated the accuracy of the model, corrected for the number of predictors and the sample size
+
+
+
+We can also look at the results in an ANOVA table. The regression equation informed us about the line that describes the yield response to nitrogen. The ANOVA table informs us about how well does this model fit to the data. In other words, it quantifies the amount of variation that is explained by the regression equation (systematic part) and tests whether it is significant.
+
+```{r}
+# Print the ANOVA table
+anova(lmSLR)
+```
+
+
+    Inspect the ANOVA table. What is the null-hypothesis of the F-test.
+     that the slope of N_quant = 0
+    Why do we have only 1 degree of freedom for ‘N_quant’?
+      because it is a continious, not catogorical, variable
+    With how many degrees of freedom is the F-value N_quant evaluated in an F distribution?
+      2 degrees of freedom (come back to this!!!)
+
+
+For our conclusions to be valid, it is important that the residuals fulfill the following assumptions:
+
+    Independence
+    Normal distribution
+    Constant variance
+
+The assumption of independence is guaranteed in this case by the experimental design: all nitrogen levels had the same probability of being assigned to an experimental plot, and experimental units were homogeneous (a completely randomized design, to be discussed in more details tomorrow).
+
+The second and third assumptions need to be checked. The normality assumption can be checked in a qq plot of the residuals and the constant variance can be checked in a plot of residuals vs. fitted. Run the lines below. To get the plots, you need to position the cursor on the console and hit Return. Each time that you hit Return, a new plot will appear.
+
+```{r}
+# Model assumptions
+plot(lmSLR, which = 1:2)
+```
+
+    Hit Return twice and observe the Q-Q plot. Do the values for the residuals correspond to what is expected for a normal distribution (i.e. closeness of the residuals to the normality line)?
+    To be excactly on the line
+    Inspect the residuals vs fitted plot (generated after the first Return ). Do you see any patterns? What would you conclude from this plot in terms of homogeneity of variance for the residuals?
+      there are no clear patterns, although there are some outliers from the normal distribution
+
+
+
+Now, we will extract the coefficients from the regression equation and add the equation to the scatterplot.
+
+```{r}
+# Plot data and regression equation
+ggplot(data = datP, aes(x = N_quant, y = yield)) +
+  geom_point() + 
+  ylab("Yield (kg/ha)") +
+  xlab("N uptake (kg/ha)") +
+  geom_line(aes(x = N_quant, y = predict(lmSLR)), color = "red") +
+  annotate("text", x = 70, y = 40, 
+           label = paste("y = ",
+                         round(coef(lmSLR)[1], digits = 3),
+                         " + ",
+                         round(coef(lmSLR)[2], digits = 3),
+                         "x"))
+```
+
+    Does the regression equation coincide with the one that you have written down?
+     Yes
+
+
+One-Way ANOVA
+
+In this part of the exercise we will use the column N_fact, which contains nitrogen levels as a qualitative variable (a so-called factor object in R). We will fit a linear model with N_fact and inspect the ANOVA table.
+
+```{r}
+# Fit the One-Way ANOVA
+lmANOVA <- lm(yield ~ N_fact, data = datP)
+
+# Print ANOVA table
+anova(lmANOVA)
+```
+
+
+    How many degrees of freedom are being used for nitrogen now? Why is this different than in the simple linear regression situation?
+      five degrees of freedom, the N is now factorial
+    What are the null and the alternative hypothesis in this case?
+      0: the N factor is independent of the yield
+    Is the null hypothesis rejected?
+      yes
+
+
+
+We will now print the coefficients for the nitrogen levels by asking for the summary output.
+
+```{r}
+# Print the coefficients
+summary(lmANOVA)
+```
+
+
+    What is given in the intercept, in other words which level of N is the reference?
+      n_factN110
+    Use the estimates for the intercept and N_factN70 to calculate the mean yield for N_factN70.
+      NfactN70= 29.262-11.666 = 17.596
+    Repeat the calculation for N_factN150.
+      13.52
+
+
+Exercise 2: Factorial design: two-Way ANOVA with interaction
+
+In this exercise we will use the data of 15 potato varieties that were planted at 2 levels of nitrogen. Each variety-nitrogen combination was repeated 5 times. The data is available in the file W1M_Potato_2N_15geno.csv.
+
+```{r}
+# Read in the data
+datPN <- read.csv(file = "W1M_Potato_2N_15geno.csv", stringsAsFactors = TRUE)
+
+# Print the first records
+head(datPN)
+
+# Inspect the structure of the data.
+str(datPN)
+
+# Visualize data
+ggplot(data = datPN, 
+       mapping = aes(x = treatment,
+                     y = yield,
+                     fill = Nitrogen)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+
+    Verify in the output that effectively there are 15 varieties and 2 levels of nitrogen.
+    Create a boxplot, coloring the boxes by nitrogen level. Do the potato varieties respond in the same way to increases of nitrogen? How can you see this in the boxplot?
+    Write down a suitable model for these data based on your conclusion in question 2.
+
+
+
+The next step is to fit a Two-Way ANOVA model for varieties (Geno), nitrogen and their interaction.
+
+```{r}
+# Fit 2-way ANOVA with interaction
+lm2wANOVA <- lm(yield ~ Geno * Nitrogen, data = datPN)
+
+# Print the ANOVA output
+anova(lm2wANOVA)
+```
+
+
+    What is your conclusion with respect to the interaction.
+     There is significant interaction between Nitrogen and Genotype
+    Does the interaction explain a sizable proportion of the total variation? Calculate this using the sum of squares.
+      861.43/2900 = 0.30
+    Are the main effects significant?
+      Yes both genotype and Nitrogen
+    Does it make sense to look at the main effects in this case? Why?
+      Yes it does, these are significantly associated to the yield
+
+Print the effects and the tables of means for the interaction, Geno and nitrogen.
+
+```{r}
+# print effects
+summary(lm2wANOVA)
+
+# print tables of means
+emmeans(lm2wANOVA, ~ Geno:Nitrogen) # means for each genotype-nitrogen combination
+
+emmeans(lm2wANOVA, ~ Geno) # means per genotype
+
+emmeans(lm2wANOVA, ~ Nitrogen) # means per nitrogen
+```
+
+
+    How are the means per genotype calculated from the table of parameter coefficients?
+      By looking at the deviations from the intercept
+    Calculate the estimated mean for G01, Nitrogen low, and G04, Nitrogen low, based on the estimated parameters. Compare your result with the value obtained from the table of means.
+      G01: 24.65 - 3.12 = 21.58
+      etc.
+
+
+    Discuss about the consequences of looking at the main effects when the interaction is significant.
+    Would it be possible to fit a model with interaction if we don’t have replicated data? Why yes/no?
+
+
+Exercise 3 Visualizing the sweetpotato yield experiment
+
+In this exercise we will use yield data of 15 sweetpotato genotypes that were grown in a RCBD with three replicates.
+
+We will import the data from a .csv file.
+
+```{r}
+dat <- read.csv("W1M_Sweetpotato_RCBD.csv")
+head(dat)
+```
+
+
+The next step is to format the data frame into a TD object for the use in statgenSTA. We use statgenSTA because it has nice features to visualize the data. A TD data object is a list. The elements in this list are one data.frame per trial. In each data.frame, there is one row per genotypic observation. Metadata, like the experimental design that was used, or the trial latitude and longitude can also be included.
+
+A TD data object can be created with the function createTD, from the package statgenSTA. Before using the function createTD, let’s have a look at its options. To do so, run the lines below. The function documentation for createTD will appear on the bottom-right part of RStudio, describing all the options of the function.
+
+```{r}
+# Explore the options of the function 'createTD'
+help(createTD)
+```
+
+
+
+    What do the options 'genotype' and 'trial' do? Why do we need these options?
+      These are the default column names to make easier plots
+    Which information is contained in the option 'trDesign'?
+      the information on the design
+
+
+```{r}
+## Create TD object
+TD <- createTD(dat, 
+               genotype = "Genotype", 
+               trial = "exp",
+               rowCoord = "row", 
+               colCoord = "col",
+               repId = "block",
+               trDesign = "rcbd")
+```
+
+After creating the TD object, go to the data environment, click on the blue arrow next to ‘TD’ and explore the ‘TD’ object.
+
+    How many elements are in this list? Does this coincide with the number of trials?
+
+
+Now, we will print the first lines for the trial ‘exp1_rcbd’ and explore its content.
+
+```{r}
+# Print the first lines of the trial 'exp1_rcbd' contained in the TD object
+head(TD$exp1_rcbd)
+```
+
+
+    Which columns are in the data frame for trial ‘exp1_rcbd’?
+      [1] "trial"    "genotype" "repId"    "rowId"    "yield"    "colId"    "rowCoord" "colCoord"
+    Which information do they contain?
+      information on the trial
+
+
+We will now visualize the experiment layout with the function plot.TD from statgenSTA and highlight genotypes “G05”, “G10”,“G15”:
+
+```{r}
+## Create layout plot 
+plot(TD, 
+     plotType = "layout", 
+     showGeno = TRUE,
+     highlight = c("G05", "G10","G15"))
+```
+
+    Does the layout correspond to a RCBD? Why?
+      Yes, each genotype is randomly placed per block
+    How many replicates are there?
+      3
+
+Before fitting the models it is always good to plot the data to get an impression about the main sources of variation. This plotting step is also very important to check whether there are values that don’t correspond to what is expected (for example, due to mistakes in the data collection).
+
+```{r}
+# Visualize yield per block
+ggplot(data = dat, 
+       mapping = aes(x = block, y = yield, fill = block)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90))
+
+# Visualize yield per genotype
+ggplot(data = dat, 
+       mapping = aes(x = Genotype, y = yield, 
+                     fill = Genotype)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+
+    Do the blocks contribute to the total phenotypic variation? Which blocks leads to the highest yield?
+      Yes block3 leads to the highest yields
+    Which genotypes seem to be higher yielding?
+      G06
+
+
+Exercise 4: Analyzing the sweetpotato experiment as if it was a CRD
+
+We are now ready to fit a linear model assuming that the experiment was coming from a CRD. This is the wrong analysis for this data.
+
+```{r}
+# Fit a linear model for fixed genotypes
+m1 <- lm(yield ~ Genotype , data = dat)
+anova(m1)
+```
+
+
+    Give model 1 in mathematical notation.
+    Look at the ANOVA table. How many degrees of freedom are used for the genotypes? Why?
+    What is the null hypothesis with regard to the F-test for Genotype?
+    Is the null hypothesis rejected?
+y = B0 + Bx + E
+df= 15-1=14
+O: there is no effect of the genotype on yield
+No,  hyphothesis is not rejected
+
+
+We will now print the parameter estimates. Then, we will use the function emmeans from the package emmeans to calculate the genotypic means, their standard error and confidence interval.
+
+```{r}
+# Print parameter estimates
+summary(m1)
+
+# Print the means per genotype
+emmeans(m1, ~ Genotype)
+```
+
+
+    Use the parameter estimates to calculate the mean of genotypes 1 and 2.
+    Do your manual calculations coincide with the results from the emmeans function?
+
+
+
+    In exercise 4 we did the wrong analysis. What would you expect to change when you perform the correct analysis?
+    include the blocks
+
+
